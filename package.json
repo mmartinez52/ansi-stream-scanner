@@ -1,0 +1,17 @@
+{
+  "name": "ansi-stream-scanner",
+  "version": "0.1.0",
+  "description": "Streaming parser and builder for ANSI/VT100 terminal escape sequences",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
