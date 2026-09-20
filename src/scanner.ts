@@ -9,9 +9,18 @@ export type Token =
   | { type: 'control'; char: string }
   | { type: 'escape'; raw: string; final: string }
   | { type: 'csi'; raw: string; params: string[]; final: string }
-  | { type: 'osc'; raw: string; payload: string };
+  | { type: 'osc'; raw: string; payload: string }
+  | { type: 'dcs'; raw: string; payload: string }
+  | { type: 'apc'; raw: string; payload: string };
 
-type State = 'ground' | 'escape' | 'csi' | 'osc' | 'osc-esc';
+type State = 'ground' | 'escape' | 'csi' | 'string' | 'string-esc';
+
+// The three ECMA-48 "control string" openers share one termination grammar
+// (data bytes ended by ST, i.e. ESC \), differing only in which token type
+// they produce. OSC additionally accepts a bare BEL as a terminator, which
+// is a de facto xterm convention rather than part of the standard, so it's
+// special-cased for that kind only.
+type StringKind = 'osc' | 'dcs' | 'apc';
 
 const ESC = '\x1b';
 const BEL = '\x07';
@@ -20,6 +29,7 @@ export class Scanner {
   private state: State = 'ground';
   private textBuffer = '';
   private seqBuffer = '';
+  private stringKind: StringKind = 'osc';
 
   constructor(private readonly emit: (token: Token) => void) {}
 
@@ -62,11 +72,11 @@ export class Scanner {
       case 'csi':
         this.stepCsi(ch);
         break;
-      case 'osc':
-        this.stepOsc(ch);
+      case 'string':
+        this.stepString(ch);
         break;
-      case 'osc-esc':
-        this.stepOscEsc(ch);
+      case 'string-esc':
+        this.stepStringEsc(ch);
         break;
     }
   }
@@ -96,7 +106,18 @@ export class Scanner {
       return;
     }
     if (ch === ']') {
-      this.state = 'osc';
+      this.stringKind = 'osc';
+      this.state = 'string';
+      return;
+    }
+    if (ch === 'P') {
+      this.stringKind = 'dcs';
+      this.state = 'string';
+      return;
+    }
+    if (ch === '_') {
+      this.stringKind = 'apc';
+      this.state = 'string';
       return;
     }
     // Anything else is a two-byte escape sequence (ESC + final byte), such
@@ -120,32 +141,32 @@ export class Scanner {
     }
   }
 
-  private stepOsc(ch: string): void {
+  private stepString(ch: string): void {
     this.seqBuffer += ch;
-    if (ch === BEL) {
-      this.emitOsc(this.seqBuffer);
+    if (ch === BEL && this.stringKind === 'osc') {
+      this.emitString(this.seqBuffer);
       return;
     }
     if (ch === ESC) {
-      this.state = 'osc-esc';
+      this.state = 'string-esc';
     }
   }
 
-  private stepOscEsc(ch: string): void {
+  private stepStringEsc(ch: string): void {
     this.seqBuffer += ch;
     if (ch === '\\') {
-      this.emitOsc(this.seqBuffer);
+      this.emitString(this.seqBuffer);
       return;
     }
     // Not a valid string terminator (ESC \); the ESC we saw belongs to plain
-    // OSC data, keep accumulating.
-    this.state = 'osc';
+    // string data, keep accumulating.
+    this.state = 'string';
   }
 
-  private emitOsc(raw: string): void {
+  private emitString(raw: string): void {
     const terminatorLength = raw.endsWith(BEL) ? 1 : 2;
     const payload = raw.slice(2, raw.length - terminatorLength);
-    this.emit({ type: 'osc', raw, payload });
+    this.emit({ type: this.stringKind, raw, payload });
     this.seqBuffer = '';
     this.state = 'ground';
   }

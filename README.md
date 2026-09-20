@@ -76,10 +76,11 @@ process.stdout.write(sequences.sgr.bold + 'hello' + sequences.sgr.reset + '\n');
 
 ## Status
 
-Early. The scanner currently covers CSI (`ESC [ ... final`), OSC
-(`ESC ] ... BEL` or `ESC ] ... ESC \`), two-byte escapes, and C0 control
-characters. It does not yet cover DCS or APC strings. See the issue tracker
-for what's planned next.
+Early. The scanner currently covers CSI (`ESC [ ... final`), the three
+ECMA-48 control strings — OSC (`ESC ] ...`), DCS (`ESC P ...`), and APC
+(`ESC _ ...`), each terminated by ST (`ESC \`), with OSC additionally
+accepting a bare BEL per the common xterm convention — two-byte escapes,
+and C0 control characters. See the issue tracker for what's planned next.
 
 ## License
 
