@@ -64,6 +64,21 @@ runs, because `scanner.push()` only ever holds the bytes for the chunk it
 was just given plus, at most, one unterminated escape sequence waiting for
 its final byte.
 
+If you'd rather pipe a stream than call `push`/`end` yourself, `TokenStream`
+wraps a `Scanner` in a Node `Transform`. It's a plain object-mode readable on
+the output side — one `Token` per readable chunk — so it composes with
+whatever else you already do with streams:
+
+```ts
+import { TokenStream, Token } from 'ansi-stream-scanner';
+
+child.stdout
+  .pipe(new TokenStream())
+  .on('data', (token: Token) => {
+    if (token.type === 'osc') console.error('OSC payload:', token.payload);
+  });
+```
+
 Building sequences to send works the same way, without any parsing at all:
 
 ```ts
@@ -80,7 +95,8 @@ Early. The scanner currently covers CSI (`ESC [ ... final`), the three
 ECMA-48 control strings — OSC (`ESC ] ...`), DCS (`ESC P ...`), and APC
 (`ESC _ ...`), each terminated by ST (`ESC \`), with OSC additionally
 accepting a bare BEL per the common xterm convention — two-byte escapes,
-and C0 control characters. See the issue tracker for what's planned next.
+and C0 control characters, plus a `TokenStream` Transform-stream wrapper for
+Node pipelines. See the issue tracker for what's planned next.
 
 ## License
 
